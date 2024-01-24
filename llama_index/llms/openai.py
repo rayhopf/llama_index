@@ -1,3 +1,5 @@
+from pprint import pprint
+from datetime import datetime
 from typing import (
     Any,
     Awaitable,
@@ -293,11 +295,20 @@ class OpenAI(LLM):
     def _chat(self, messages: Sequence[ChatMessage], **kwargs: Any) -> ChatResponse:
         client = self._get_client()
         message_dicts = to_openai_message_dicts(messages)
+        pprint(
+            f""">>>llama_index/llms/openai.py/OpenAI._chat
+message_dicts:
+"""
+        )
+        pprint(message_dicts)
+        pprint("self._get_model_kwargs(**kwargs): ")
+        pprint(self._get_model_kwargs(**kwargs))
         response = client.chat.completions.create(
             messages=message_dicts,
             stream=False,
             **self._get_model_kwargs(**kwargs),
         )
+        pprint(f""">>>_chat, response: {response}""")
         openai_message = response.choices[0].message
         message = from_openai_message(openai_message)
 
@@ -364,11 +375,20 @@ class OpenAI(LLM):
             tool_calls: List[ChoiceDeltaToolCall] = []
 
             is_function = False
+            pprint(
+                f""">>>llama_index/llms/openai.py/OpenAI._stream_chat
+message_dicts:
+"""
+            )
+            pprint(message_dicts)
+            pprint("self._get_model_kwargs(**kwargs): ")
+            pprint(self._get_model_kwargs(**kwargs))
             for response in client.chat.completions.create(
                 messages=message_dicts,
                 stream=True,
                 **self._get_model_kwargs(**kwargs),
             ):
+                pprint(f""">>>_stream_chat, response: {response}""")
                 response = cast(ChatCompletionChunk, response)
                 if len(response.choices) > 0:
                     delta = response.choices[0].delta
@@ -535,9 +555,18 @@ class OpenAI(LLM):
     ) -> ChatResponse:
         aclient = self._get_aclient()
         message_dicts = to_openai_message_dicts(messages)
+        pprint(
+            f""">>>llama_index/llms/openai.py/OpenAI._achat
+message_dicts:
+"""
+        )
+        pprint(message_dicts)
+        pprint("self._get_model_kwargs(**kwargs): ")
+        pprint(self._get_model_kwargs(**kwargs))
         response = await aclient.chat.completions.create(
             messages=message_dicts, stream=False, **self._get_model_kwargs(**kwargs)
         )
+        pprint(f""">>>_achat, response: {response}""")
         message_dict = response.choices[0].message
         message = from_openai_message(message_dict)
 
@@ -559,11 +588,20 @@ class OpenAI(LLM):
 
             is_function = False
             first_chat_chunk = True
+            pprint(
+                f""">>>llama_index/llms/openai.py/OpenAI._astream_chat
+message_dicts:
+"""
+            )
+            pprint(message_dicts)
+            pprint("self._get_model_kwargs(**kwargs): ")
+            pprint(self._get_model_kwargs(**kwargs))
             async for response in await aclient.chat.completions.create(
                 messages=message_dicts,
                 stream=True,
                 **self._get_model_kwargs(**kwargs),
             ):
+                pprint(f"""[{datetime.now()}] >>>_astream_chat, response: {response}""")
                 response = cast(ChatCompletionChunk, response)
                 if len(response.choices) > 0:
                     # check if the first chunk has neither content nor tool_calls

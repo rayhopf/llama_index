@@ -2,6 +2,7 @@ import uuid
 from abc import abstractmethod
 from collections import deque
 from typing import Any, Deque, Dict, List, Optional, Union, cast
+from datetime import datetime
 
 from llama_index.agent.types import (
     BaseAgent,
@@ -324,18 +325,32 @@ class AgentRunner(BaseAgentRunner):
         **kwargs: Any,
     ) -> TaskStepOutput:
         """Execute step."""
+        print(f"[{datetime.now()}] >>>>>_arun_step 001 task_id {task_id}, step {step}, mode {mode}")
         task = self.state.get_task(task_id)
         step_queue = self.state.get_step_queue(task_id)
-        step = step or step_queue.popleft()
-
+        print(f"[{datetime.now()}] >>>>>_arun_step 002 step_queue {step_queue}")
+        
+        # step = step or step_queue.popleft()
+        if not step:
+            print(f"[{datetime.now()}] >>>>>_arun_step 002.2 len(step_queue) {len(step_queue)}, step_queue {step_queue}")
+            step = step_queue.popleft()
+        else:
+            print(f"[{datetime.now()}] >>>>>_arun_step 002.3 step {step}, len(step_queue) {len(step_queue)}, step_queue {step_queue}")
+        
+        print(f"[{datetime.now()}] >>>>>_arun_step 003 step {step}")
         # TODO: figure out if you can dynamically swap in different step executors
         # not clear when you would do that by theoretically possible
         if mode == ChatResponseMode.WAIT:
+            print(f"[{datetime.now()}] >>>>>_arun_step 003.1.1 ChatResponseMode.WAIT start")
             cur_step_output = await self.agent_worker.arun_step(step, task, **kwargs)
+            print(f"[{datetime.now()}] >>>>>_arun_step 003.1.1 ChatResponseMode.WAIT end")
         elif mode == ChatResponseMode.STREAM:
+            print(f"[{datetime.now()}] >>>>>_arun_step 003.1.2 ChatResponseMode.STREAM start")
             cur_step_output = await self.agent_worker.astream_step(step, task, **kwargs)
+            print(f"[{datetime.now()}] >>>>>_arun_step 003.1.2 ChatResponseMode.STREAM end")
         else:
             raise ValueError(f"Invalid mode: {mode}")
+        print(f"[{datetime.now()}] >>>>>_arun_step 003.2 cur_step_output {cur_step_output}")
         # append cur_step_output next steps to queue
         next_steps = cur_step_output.next_steps
         step_queue.extend(next_steps)
@@ -343,7 +358,8 @@ class AgentRunner(BaseAgentRunner):
         # add cur_step_output to completed steps
         completed_steps = self.state.get_completed_steps(task_id)
         completed_steps.append(cur_step_output)
-
+        print(f"[{datetime.now()}] >>>>>_arun_step 004 completed_steps {completed_steps}")
+        
         return cur_step_output
 
     def run_step(
@@ -400,6 +416,7 @@ class AgentRunner(BaseAgentRunner):
         step_output: Optional[TaskStepOutput] = None,
     ) -> AGENT_CHAT_RESPONSE_TYPE:
         """Finalize response."""
+        print(f"[{datetime.now()}] >>>>>finalize_response 001")
         if step_output is None:
             step_output = self.state.get_completed_steps(task_id)[-1]
         if not step_output.is_last:
@@ -462,17 +479,21 @@ class AgentRunner(BaseAgentRunner):
         """Chat with step executor."""
         if chat_history is not None:
             self.memory.set(chat_history)
+        print(f"[{datetime.now()}] >>>>>_achat 003 message: {message}")
         task = self.create_task(message)
 
         result_output = None
         while True:
             # pass step queue in as argument, assume step executor is stateless
+            print(f"[{datetime.now()}] >>>>>_achat 003.1 task.task_id: {task.task_id}, {mode}, {tool_choice}")
             cur_step_output = await self._arun_step(
                 task.task_id, mode=mode, tool_choice=tool_choice
             )
-
+            print(f"[{datetime.now()}] >>>>>_achat 003.2 cur_step_output.is_last: {cur_step_output.is_last}")
+            print(f"[{datetime.now()}] >>>>>_achat 003.3 cur_step_output: {cur_step_output}")
             if cur_step_output.is_last:
                 result_output = cur_step_output
+                print(f"[{datetime.now()}] >>>>>_achat 003.4 cur_step_output: {cur_step_output}")
                 break
 
             # ensure tool_choice does not cause endless loops
@@ -557,9 +578,11 @@ class AgentRunner(BaseAgentRunner):
             CBEventType.AGENT_STEP,
             payload={EventPayload.MESSAGES: [message]},
         ) as e:
+            print(f"[{datetime.now()}] >>>>>astream_chat 001")
             chat_response = await self._achat(
                 message, chat_history, tool_choice, mode=ChatResponseMode.STREAM
             )
+            print(f"[{datetime.now()}] >>>>>astream_chat 002")
             assert isinstance(chat_response, StreamingAgentChatResponse)
             e.on_end(payload={EventPayload.RESPONSE: chat_response})
         return chat_response
